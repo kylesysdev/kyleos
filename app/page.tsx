@@ -46,15 +46,15 @@ export default function Home() {
            <h3 className="text-neon-green mb-2 pb-1 border-b border-gray-800">SYSTEM_DIAGNOSTICS</h3>
            <div className="space-y-2">
              <div className="flex justify-between">
-               <span>> NETWORK_LATENCY</span>
+               <span>&gt; NETWORK_LATENCY</span>
                <span className="text-neon-blue">24ms</span>
              </div>
              <div className="flex justify-between">
-               <span>> MEMORY_ALLOCATION</span>
+               <span>&gt; MEMORY_ALLOCATION</span>
                <span className="text-neon-blue">14%</span>
              </div>
              <div className="flex justify-between">
-               <span>> POLLINATIONS_API</span>
+               <span>&gt; POLLINATIONS_API</span>
                <span className="text-neon-green">CONNECTED</span>
              </div>
              <div className="mt-4 text-[10px] text-gray-600">
