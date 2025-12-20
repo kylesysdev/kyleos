@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --neon-green: #00ff41;
+  --neon-blue: #00f3ff;
+  --bg-dark: #050505;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--neon-green);
+  font-family: 'Courier New', Courier, monospace;
+  overflow: hidden;
+}
+
+/* Custom Utilities */
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+  }
+  
+  .text-glow-blue {
+    text-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
+  }
+
+  .border-neon {
+    border: 1px solid var(--neon-green);
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+  }
+
+  .border-neon-blue {
+    border: 1px solid var(--neon-blue);
+    box-shadow: 0 0 8px rgba(0, 243, 255, 0.2);
+  }
+  
+  .bg-glass {
+    background: rgba(10, 10, 10, 0.7);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Scanline effect for that retro feel */
+  .scanline {
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0),
+      rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.2) 50%,
+      rgba(0,0,0,0.2)
+    );
+    background-size: 100% 4px;
+    position: absolute;
+    pointer-events: none;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+    opacity: 0.15;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a1a1a;
+  border: 1px solid var(--neon-green);
+}
