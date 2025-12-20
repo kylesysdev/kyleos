@@ -58,13 +58,13 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
         ))}
         
         {loading && (
-           <div className="text-neon-green animate-pulse text-xs">> PROCESSING DATA STREAM...</div>
+           <div className="text-neon-green animate-pulse text-xs">&gt; PROCESSING DATA STREAM...</div>
         )}
         <div ref={scrollRef} />
       </div>
 
       <div className="mt-2 border-t border-green-900/50 pt-2 flex gap-2">
-        <span className="text-neon-green py-3 pl-2">></span>
+        <span className="text-neon-green py-3 pl-2">&gt;</span>
         <input 
           type="text" 
           value={input}
