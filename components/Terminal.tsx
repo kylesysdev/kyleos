@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
   Send, Terminal as TerminalIcon, Mic, MicOff, 
-  Play, Pause, SkipBack, SkipForward, Square, Repeat 
+  Play, Square, Repeat, Volume2 
 } from 'lucide-react';
 import { askKyle } from '../lib/api';
 
@@ -12,185 +12,153 @@ interface IWindow extends Window {
 }
 
 export default function Terminal({ onImageCommand }: { onImageCommand: (p: string) => void }) {
-  // Chat State
+  // --- STATE ---
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<{ role: string, content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Audio Player State
+  // Audio State
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [speechQueue, setSpeechQueue] = useState<string[]>([]);
-  const [currentSentenceIdx, setCurrentSentenceIdx] = useState(0);
-  
-  // Voice Input State
   const [isListening, setIsListening] = useState(false);
   const [continuousMode, setContinuousMode] = useState(false);
   
+  // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const historyRef = useRef(history); // For accessing history inside callbacks
+  const isSpeakingRef = useRef(false); // Ref for instant access inside event listeners
+  const historyRef = useRef(history);
   historyRef.current = history;
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, loading, currentSentenceIdx]);
+  }, [history, loading]);
 
-  // --- AUDIO ENGINE: PLAYER LOGIC ---
-  
-  const processAndSpeak = (text: string) => {
-    // 1. Split text into sentences for "Seeking" ability
-    // Split by dots, exclamation, questions, but keep the punctuation.
-    const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
-    const cleanSentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
-    
-    setSpeechQueue(cleanSentences);
-    setCurrentSentenceIdx(0);
-    setIsPaused(false);
-    setIsSpeaking(true);
-    
-    // Start speaking the first sentence
-    speakSentence(cleanSentences[0]);
-  };
+  // --- AUDIO ENGINE ---
 
-  const speakSentence = (sentence: string) => {
+  const speak = (text: string) => {
     if (typeof window === 'undefined') return;
     
-    // Cancel any current audio
+    // Cancel old audio
     window.speechSynthesis.cancel();
-    
-    const utterance = new SpeechSynthesisUtterance(sentence);
+    setIsSpeaking(true);
+    isSpeakingRef.current = true;
+
+    const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
     if (preferredVoice) utterance.voice = preferredVoice;
-    utterance.pitch = 0.9;
+    
+    utterance.pitch = 1.0; 
     utterance.rate = 1.0;
 
     utterance.onend = () => {
-      // When sentence finishes, play next one
-      playNextSentence();
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
     };
 
     window.speechSynthesis.speak(utterance);
   };
 
-  const playNextSentence = () => {
-    setSpeechQueue(prevQueue => {
-      setCurrentSentenceIdx(prevIdx => {
-        const nextIdx = prevIdx + 1;
-        if (nextIdx < prevQueue.length) {
-          // Play next
-          speakSentence(prevQueue[nextIdx]);
-          return nextIdx;
-        } else {
-          // Finished entire paragraph
-          setIsSpeaking(false);
-          setSpeechQueue([]);
-          // CONTINUOUS MODE: Start listening again now that Kyle is done
-          if (continuousMode) {
-             startListening();
-          }
-          return 0;
-        }
-      });
-      return prevQueue; // Return same queue, just needed access to it
-    });
-  };
-
-  // --- PLAYER CONTROLS ---
-
-  const handlePauseResume = () => {
-    if (isPaused) {
-      window.speechSynthesis.resume();
-      setIsPaused(false);
-    } else {
-      window.speechSynthesis.pause();
-      setIsPaused(true);
-    }
-  };
-
-  const handleSeek = (direction: 'prev' | 'next') => {
-    window.speechSynthesis.cancel();
-    let newIdx = direction === 'next' ? currentSentenceIdx + 1 : currentSentenceIdx - 1;
-    
-    // Bounds check
-    if (newIdx < 0) newIdx = 0;
-    if (newIdx >= speechQueue.length) {
-        setIsSpeaking(false); // End of list
-        return;
-    }
-
-    setCurrentSentenceIdx(newIdx);
-    speakSentence(speechQueue[newIdx]);
-    setIsPaused(false);
-  };
-
-  const handleInterrupt = () => {
+  const stopSpeaking = () => {
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
-    setSpeechQueue([]);
-    // Immediately start listening for user command
-    startListening(); 
+    isSpeakingRef.current = false;
   };
 
-  // --- VOICE RECOGNITION (Input) ---
+  // --- VOICE RECOGNITION (The "Ear") ---
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setContinuousMode(false); // Manual stop kills continuous mode
+  };
 
   const startListening = () => {
-    if (typeof window === 'undefined') return;
-    
-    // Don't listen if Kyle is talking (Echo prevention)
-    if (isSpeaking && !isPaused) return;
-
     const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
     const SpeechRecognitionAPI = SpeechRecognition || webkitSpeechRecognition;
-
     if (!SpeechRecognitionAPI) return;
 
-    // Prevent multiple instances
-    if (isListening) return;
+    // Prevent duplicates
+    if (recognitionRef.current) return;
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = false; // We use auto-restart manually
+    recognition.continuous = true; // TRUE = Keep listening forever (until we stop it)
+    recognition.interimResults = false; 
     recognition.lang = 'en-US';
-    recognition.interimResults = false;
 
     recognition.onstart = () => setIsListening(true);
     
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInput(transcript);
-      handleSend(transcript); // Auto-send on silence
+    recognition.onend = () => {
+      // If continuous mode is on, forcefully restart the ear if it dies
+      if (continuousMode) {
+        try { recognition.start(); } catch(e) {} 
+      } else {
+        setIsListening(false);
+        recognitionRef.current = null;
+      }
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-      // If continuous mode is on BUT we didn't get a result (just silence), restart? 
-      // Usually better to wait for user trigger to avoid loops, but user asked for "Conversation Style".
-      // We only restart if Kyle isn't about to speak.
+    recognition.onresult = (event: any) => {
+      // Get the latest transcript
+      const lastResultIdx = event.results.length - 1;
+      const transcript = event.results[lastResultIdx][0].transcript.trim();
+      
+      if (!transcript) return;
+
+      // --- BARGE-IN LOGIC ---
+      // If Kyle is speaking, and we hear input, SHUT HIM UP.
+      if (isSpeakingRef.current) {
+        stopSpeaking(); // <--- This interrupts him mid-sentence
+      }
+
+      setInput(transcript);
+      handleSend(transcript);
     };
-    
+
     recognitionRef.current = recognition;
     recognition.start();
   };
+
+  // Toggle Continuous Mode
+  const toggleContinuous = () => {
+    const newState = !continuousMode;
+    setContinuousMode(newState);
+    if (newState && !isListening) {
+      startListening();
+    }
+  };
+
+  // --- BRAIN ---
 
   const handleSend = async (manualInput?: string) => {
     const textToSend = manualInput || input;
     if (!textToSend.trim()) return;
 
-    // Stop listening while processing
-    if (recognitionRef.current) recognitionRef.current.stop();
+    // We do NOT stop listening here anymore. The ear stays open.
 
     const userMsg = { role: 'user', content: textToSend };
     setHistory(prev => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
-    // Check Image Command
+    // Image Check
     if (textToSend.toLowerCase().startsWith('/image') || textToSend.toLowerCase().includes('generate image')) {
        const prompt = textToSend.replace(/^\/image/i, '').replace(/generate image/i, '').trim();
        onImageCommand(prompt || textToSend);
-       setHistory(prev => [...prev, { role: 'assistant', content: `[FLUX] Generating: "${prompt}"` }]);
-       processAndSpeak("I am generating that image for you now.");
+       const reply = `Generating image: ${prompt}`;
+       setHistory(prev => [...prev, { role: 'assistant', content: reply }]);
+       speak(reply);
        setLoading(false);
        return;
     }
@@ -198,9 +166,9 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
     try {
       const response = await askKyle([...historyRef.current, userMsg]);
       setHistory(prev => [...prev, { role: 'assistant', content: response }]);
-      processAndSpeak(response); // Use new player engine
+      speak(response); 
     } catch (e) {
-      setHistory(prev => [...prev, { role: 'assistant', content: "Error connecting to AI." }]);
+      setHistory(prev => [...prev, { role: 'assistant', content: "Connection Error." }]);
     } finally {
       setLoading(false);
     }
@@ -209,57 +177,49 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
   return (
     <div className="flex flex-col h-full font-mono text-sm relative">
       
-      {/* HEADER: Media Player & Controls */}
-      <div className="absolute top-0 left-0 w-full p-2 z-20 flex justify-between items-center bg-black/40 backdrop-blur-sm border-b border-green-900/30">
-        <div className="flex items-center gap-2">
-           <button 
-             onClick={() => setContinuousMode(!continuousMode)}
-             className={`p-1.5 rounded transition-all ${continuousMode ? 'text-neon-green bg-green-900/20 border border-neon-green' : 'text-gray-500'}`}
-             title="Hands-Free Loop"
-           >
-             <Repeat size={14} />
-           </button>
-           <span className="text-[10px] text-green-600 uppercase tracking-widest">
-             {continuousMode ? "Hands-Free" : "Manual"}
-           </span>
-        </div>
-
-        {/* Player Controls (Only show when active) */}
-        <div className={`flex items-center gap-1 transition-opacity duration-300 ${isSpeaking || isPaused ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-           <button onClick={() => handleSeek('prev')} className="p-1 text-neon-green hover:text-white"><SkipBack size={16}/></button>
-           <button onClick={handlePauseResume} className="p-1 text-neon-green hover:text-white">
-             {isPaused ? <Play size={16}/> : <Pause size={16}/>}
-           </button>
-           <button onClick={() => handleSeek('next')} className="p-1 text-neon-green hover:text-white"><SkipForward size={16}/></button>
-           <button onClick={handleInterrupt} className="p-1 text-red-500 hover:text-red-400 ml-2" title="Interrupt"><Square size={16} fill="currentColor" /></button>
-        </div>
+      {/* STATUS BAR */}
+      <div className="absolute top-0 right-0 p-2 z-10 flex gap-2">
+         {/* Continuous Toggle */}
+        <button 
+          onClick={toggleContinuous}
+          className={`px-2 py-1 rounded text-xs border transition-all flex items-center gap-1 ${continuousMode ? 'bg-green-900/40 border-neon-green text-neon-green' : 'border-gray-700 text-gray-500'}`}
+        >
+          <Repeat size={12} />
+          {continuousMode ? "HANDS-FREE ON" : "HANDS-FREE OFF"}
+        </button>
       </div>
 
       {/* CHAT AREA */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-2 pt-12 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-4 p-2 pt-8 custom-scrollbar">
         {history.length === 0 && (
           <div className="text-gray-500 mt-20 text-center flex flex-col items-center">
             <TerminalIcon className="mb-4 opacity-30" size={48} />
-            <p className="text-lg text-neon-green tracking-widest">KYLE OS v1.3</p>
-            <p className="text-xs text-gray-600 mt-2">MEDIA ENGINE ONLINE</p>
+            <p className="text-lg text-neon-green tracking-widest">KYLE OS v1.4</p>
+            <p className="text-xs text-gray-600 mt-2">DUPLEX AUDIO SYSTEM</p>
           </div>
         )}
         
         {history.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] p-3 rounded-lg border ${msg.role === 'user' ? 'bg-green-900/20 border-green-800 text-green-100' : 'bg-transparent border-none text-neon-green'}`}>
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
+            
+            {/* Message Bubble */}
+            <div className={`max-w-[85%] relative p-3 rounded-lg border ${msg.role === 'user' ? 'bg-green-900/20 border-green-800 text-green-100' : 'bg-transparent border-none text-neon-green'}`}>
               <span className="whitespace-pre-wrap leading-relaxed">{msg.content}</span>
               
-              {/* Highlight current sentence being spoken */}
-              {msg.role === 'assistant' && i === history.length - 1 && isSpeaking && (
-                 <div className="mt-2 h-1 w-full bg-green-900/30 rounded overflow-hidden">
-                    <div className="h-full bg-neon-green animate-progress" style={{ width: `${((currentSentenceIdx + 1) / speechQueue.length) * 100}%` }}></div>
-                 </div>
+              {/* REPLAY BUTTON (Shows on hover or always on mobile) */}
+              {msg.role === 'assistant' && (
+                <button 
+                  onClick={() => speak(msg.content)}
+                  className="absolute -right-8 top-0 p-2 text-gray-600 hover:text-neon-green opacity-50 hover:opacity-100 transition-opacity"
+                  title="Replay Audio"
+                >
+                  <Volume2 size={16} />
+                </button>
               )}
             </div>
           </div>
         ))}
-        {loading && <div className="text-neon-green animate-pulse text-xs pl-2">&gt; GENERATING RESPONSE...</div>}
+        {loading && <div className="text-neon-green animate-pulse text-xs pl-2">&gt; PROCESSING...</div>}
         <div ref={scrollRef} />
       </div>
 
@@ -272,14 +232,15 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           className="flex-1 bg-transparent text-green-100 focus:outline-none placeholder-green-900 text-base"
-          placeholder={continuousMode ? "Listening automatically..." : "Type command..."}
+          placeholder={continuousMode ? "Listening..." : "Type command..."}
         />
         
+        {/* Main Mic/Stop Button */}
         <button 
-          onClick={isSpeaking ? handleInterrupt : startListening} 
-          className={`p-3 rounded-full transition-all duration-300 ${isListening ? 'bg-red-900/80 text-white animate-pulse shadow-[0_0_15px_#ff0000]' : 'text-neon-green hover:bg-green-900/30'}`}
+          onClick={isSpeaking ? stopSpeaking : toggleListening} 
+          className={`p-3 rounded-full transition-all duration-300 ${isListening ? 'bg-red-900/20 text-red-500 border border-red-900 animate-pulse' : 'text-neon-green hover:bg-green-900/30'}`}
         >
-          {isListening ? <MicOff size={20} /> : (isSpeaking ? <Square size={20} fill="currentColor" className="text-red-500"/> : <Mic size={20} />)}
+          {isSpeaking ? <Square size={20} fill="currentColor" /> : (isListening ? <MicOff size={20} /> : <Mic size={20} />)}
         </button>
       </div>
     </div>
