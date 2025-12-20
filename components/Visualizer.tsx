@@ -50,7 +50,7 @@ export default function Visualizer({ prompt }: { prompt: string | null }) {
       
       {/* HUD Overlay */}
       <div className="absolute bottom-0 left-0 w-full bg-black/80 border-t border-cyan-500 p-2 backdrop-blur-md">
-        <p className="text-xs text-cyan-300 font-mono truncate">> INPUT: {prompt}</p>
+        <p className="text-xs text-cyan-300 font-mono truncate">&gt; INPUT: {prompt}</p>
       </div>
     </div>
   );
