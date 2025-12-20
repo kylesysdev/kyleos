@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
   Send, Terminal as TerminalIcon, Mic, MicOff, 
-  Play, Square, Repeat, Volume2 
+  Play, Pause, SkipBack, SkipForward, Radio 
 } from 'lucide-react';
 import { askKyle } from '../lib/api';
 
@@ -17,148 +17,175 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
   const [history, setHistory] = useState<{ role: string, content: string }[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Audio State
+  // Audio Player State (Restored)
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [continuousMode, setContinuousMode] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [speechQueue, setSpeechQueue] = useState<string[]>([]);
+  const [currentSentenceIdx, setCurrentSentenceIdx] = useState(0);
+
+  // Wake Word State
+  const [isListening, setIsListening] = useState(false); // Is the mic strictly "Open"?
+  const [wakeWordActive, setWakeWordActive] = useState(false); // Has "KYLE" been triggered?
   
-  // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
-  const isSpeakingRef = useRef(false); // Ref for instant access inside event listeners
+  const isSpeakingRef = useRef(false); 
   const historyRef = useRef(history);
   historyRef.current = history;
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, loading]);
+  }, [history, loading, currentSentenceIdx]);
 
-  // --- AUDIO ENGINE ---
-
-  const speak = (text: string) => {
-    if (typeof window === 'undefined') return;
+  // --- AUDIO ENGINE (PLAYER) ---
+  const processAndSpeak = (text: string) => {
+    const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+    const cleanSentences = sentences.map(s => s.trim()).filter(s => s.length > 0);
     
-    // Cancel old audio
-    window.speechSynthesis.cancel();
+    setSpeechQueue(cleanSentences);
+    setCurrentSentenceIdx(0);
+    setIsPaused(false);
     setIsSpeaking(true);
     isSpeakingRef.current = true;
+    
+    speakSentence(cleanSentences[0]);
+  };
 
-    const utterance = new SpeechSynthesisUtterance(text);
+  const speakSentence = (sentence: string) => {
+    if (typeof window === 'undefined') return;
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(sentence);
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(v => v.name.includes('Google US English') || v.name.includes('Samantha'));
     if (preferredVoice) utterance.voice = preferredVoice;
-    
-    utterance.pitch = 1.0; 
-    utterance.rate = 1.0;
+    utterance.pitch = 1.0; utterance.rate = 1.0;
 
     utterance.onend = () => {
-      setIsSpeaking(false);
-      isSpeakingRef.current = false;
+      // Auto-advance to next sentence
+      playNextSentence();
     };
 
     window.speechSynthesis.speak(utterance);
   };
 
-  const stopSpeaking = () => {
+  const playNextSentence = () => {
+    setSpeechQueue(prev => {
+      setCurrentSentenceIdx(idx => {
+        const nextIdx = idx + 1;
+        if (nextIdx < prev.length) {
+          speakSentence(prev[nextIdx]);
+          return nextIdx;
+        } else {
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+          setWakeWordActive(false); // Reset wake word after interaction
+          return 0;
+        }
+      });
+      return prev;
+    });
+  };
+
+  // --- PLAYER CONTROLS ---
+  const handlePauseResume = () => {
+    if (isPaused) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+    } else {
+      window.speechSynthesis.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const handleSeek = (direction: 'prev' | 'next') => {
+    window.speechSynthesis.cancel();
+    let newIdx = direction === 'next' ? currentSentenceIdx + 1 : currentSentenceIdx - 1;
+    if (newIdx < 0) newIdx = 0;
+    if (newIdx >= speechQueue.length) {
+        setIsSpeaking(false); isSpeakingRef.current = false; return;
+    }
+    setCurrentSentenceIdx(newIdx);
+    speakSentence(speechQueue[newIdx]);
+    setIsPaused(false);
+  };
+
+  const forceStop = () => {
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
     isSpeakingRef.current = false;
+    setSpeechQueue([]);
   };
 
-  // --- VOICE RECOGNITION (The "Ear") ---
-
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  };
-
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-    setContinuousMode(false); // Manual stop kills continuous mode
-  };
-
+  // --- WAKE WORD ENGINE ("THE EAR") ---
   const startListening = () => {
     const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
     const SpeechRecognitionAPI = SpeechRecognition || webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) return;
-
-    // Prevent duplicates
-    if (recognitionRef.current) return;
+    if (!SpeechRecognitionAPI || recognitionRef.current) return;
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.continuous = true; // TRUE = Keep listening forever (until we stop it)
-    recognition.interimResults = false; 
+    recognition.continuous = true;
+    recognition.interimResults = true; // Use interim to catch "Kyle" faster
     recognition.lang = 'en-US';
 
     recognition.onstart = () => setIsListening(true);
     
-    recognition.onend = () => {
-      // If continuous mode is on, forcefully restart the ear if it dies
-      if (continuousMode) {
-        try { recognition.start(); } catch(e) {} 
-      } else {
-        setIsListening(false);
-        recognitionRef.current = null;
+    recognition.onresult = (event: any) => {
+      const lastResultIdx = event.results.length - 1;
+      const transcript = event.results[lastResultIdx][0].transcript.toLowerCase().trim();
+      const isFinal = event.results[lastResultIdx].isFinal;
+
+      // 1. WAKE WORD CHECK
+      if (transcript.includes("kyle") || transcript.includes("coil") || transcript.includes("carl")) {
+         if (!wakeWordActive) {
+           setWakeWordActive(true);
+           // If he's talking, shut him up
+           if (isSpeakingRef.current) forceStop();
+         }
+      }
+
+      // 2. PROCESS COMMAND (Only if active)
+      if (wakeWordActive || isListening) { // "isListening" is manual override
+         setInput(transcript);
+         
+         // If user stops talking (final result), send it
+         if (isFinal && wakeWordActive) {
+            // Strip the wake word out so we don't send "Kyle, hello" every time
+            const cleanText = transcript.replace(/kyle|coil|carl/gi, "").trim();
+            if (cleanText.length > 0) {
+              handleSend(cleanText);
+            }
+         }
       }
     };
 
-    recognition.onresult = (event: any) => {
-      // Get the latest transcript
-      const lastResultIdx = event.results.length - 1;
-      const transcript = event.results[lastResultIdx][0].transcript.trim();
-      
-      if (!transcript) return;
-
-      // --- BARGE-IN LOGIC ---
-      // If Kyle is speaking, and we hear input, SHUT HIM UP.
-      if (isSpeakingRef.current) {
-        stopSpeaking(); // <--- This interrupts him mid-sentence
-      }
-
-      setInput(transcript);
-      handleSend(transcript);
+    recognition.onend = () => {
+      // Auto-restart listener (Forever loop)
+      recognition.start();
     };
 
     recognitionRef.current = recognition;
     recognition.start();
   };
 
-  // Toggle Continuous Mode
-  const toggleContinuous = () => {
-    const newState = !continuousMode;
-    setContinuousMode(newState);
-    if (newState && !isListening) {
-      startListening();
-    }
-  };
-
-  // --- BRAIN ---
-
   const handleSend = async (manualInput?: string) => {
     const textToSend = manualInput || input;
     if (!textToSend.trim()) return;
 
-    // We do NOT stop listening here anymore. The ear stays open.
-
+    // Reset Input
+    setInput('');
+    setWakeWordActive(false); // Go back to sleep/passive mode
+    
     const userMsg = { role: 'user', content: textToSend };
     setHistory(prev => [...prev, userMsg]);
-    setInput('');
     setLoading(true);
 
-    // Image Check
     if (textToSend.toLowerCase().startsWith('/image') || textToSend.toLowerCase().includes('generate image')) {
        const prompt = textToSend.replace(/^\/image/i, '').replace(/generate image/i, '').trim();
        onImageCommand(prompt || textToSend);
-       const reply = `Generating image: ${prompt}`;
+       const reply = `Generating visual: ${prompt}`;
        setHistory(prev => [...prev, { role: 'assistant', content: reply }]);
-       speak(reply);
+       processAndSpeak(reply);
        setLoading(false);
        return;
     }
@@ -166,55 +193,65 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
     try {
       const response = await askKyle([...historyRef.current, userMsg]);
       setHistory(prev => [...prev, { role: 'assistant', content: response }]);
-      speak(response); 
+      processAndSpeak(response); 
     } catch (e) {
-      setHistory(prev => [...prev, { role: 'assistant', content: "Connection Error." }]);
+      setHistory(prev => [...prev, { role: 'assistant', content: "Network Failure." }]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Start listening on mount (optional, or wait for user click)
+  // useEffect(() => { startListening() }, []); 
+
   return (
     <div className="flex flex-col h-full font-mono text-sm relative">
       
-      {/* STATUS BAR */}
-      <div className="absolute top-0 right-0 p-2 z-10 flex gap-2">
-         {/* Continuous Toggle */}
-        <button 
-          onClick={toggleContinuous}
-          className={`px-2 py-1 rounded text-xs border transition-all flex items-center gap-1 ${continuousMode ? 'bg-green-900/40 border-neon-green text-neon-green' : 'border-gray-700 text-gray-500'}`}
-        >
-          <Repeat size={12} />
-          {continuousMode ? "HANDS-FREE ON" : "HANDS-FREE OFF"}
-        </button>
+      {/* HEADER: Media Player (Restored) */}
+      <div className={`absolute top-0 left-0 w-full p-2 z-20 flex justify-between items-center transition-all duration-300 ${isSpeaking ? 'bg-green-900/40 border-b border-green-500' : 'bg-transparent'}`}>
+        {/* Status Indicator */}
+        <div className="flex items-center gap-2">
+           <div className={`w-3 h-3 rounded-full transition-colors ${wakeWordActive ? 'bg-red-500 animate-pulse shadow-[0_0_10px_red]' : (isListening ? 'bg-green-500' : 'bg-gray-500')}`}></div>
+           <span className="text-[10px] uppercase tracking-widest text-green-100">
+             {wakeWordActive ? "LISTENING..." : (isListening ? "PASSIVE MODE" : "OFFLINE")}
+           </span>
+        </div>
+
+        {/* Player Controls */}
+        <div className={`flex items-center gap-2 transition-opacity duration-300 ${isSpeaking ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+           <button onClick={() => handleSeek('prev')} className="p-1 text-neon-green hover:text-white"><SkipBack size={18}/></button>
+           <button onClick={handlePauseResume} className="p-1 text-neon-green hover:text-white">
+             {isPaused ? <Play size={18}/> : <Pause size={18}/>}
+           </button>
+           <button onClick={() => handleSeek('next')} className="p-1 text-neon-green hover:text-white"><SkipForward size={18}/></button>
+        </div>
       </div>
 
       {/* CHAT AREA */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-2 pt-8 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto space-y-4 p-2 pt-12 custom-scrollbar">
         {history.length === 0 && (
           <div className="text-gray-500 mt-20 text-center flex flex-col items-center">
-            <TerminalIcon className="mb-4 opacity-30" size={48} />
-            <p className="text-lg text-neon-green tracking-widest">KYLE OS v1.4</p>
-            <p className="text-xs text-gray-600 mt-2">DUPLEX AUDIO SYSTEM</p>
+            <Radio className={`mb-4 ${isListening ? 'text-neon-green animate-pulse' : 'text-gray-600'}`} size={48} />
+            <p className="text-lg text-neon-green tracking-widest">KYLE OS v1.5</p>
+            <p className="text-xs text-gray-500 mt-2">SAY "KYLE" TO WAKE UP</p>
+            <button 
+              onClick={startListening}
+              className="mt-4 px-4 py-2 border border-green-800 text-green-500 rounded hover:bg-green-900/20 text-xs"
+            >
+              INITIALIZE AUDIO SENSORS
+            </button>
           </div>
         )}
         
         {history.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} group`}>
-            
-            {/* Message Bubble */}
-            <div className={`max-w-[85%] relative p-3 rounded-lg border ${msg.role === 'user' ? 'bg-green-900/20 border-green-800 text-green-100' : 'bg-transparent border-none text-neon-green'}`}>
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] p-3 rounded-lg border ${msg.role === 'user' ? 'bg-green-900/20 border-green-800 text-green-100' : 'bg-transparent border-none text-neon-green'}`}>
               <span className="whitespace-pre-wrap leading-relaxed">{msg.content}</span>
-              
-              {/* REPLAY BUTTON (Shows on hover or always on mobile) */}
-              {msg.role === 'assistant' && (
-                <button 
-                  onClick={() => speak(msg.content)}
-                  className="absolute -right-8 top-0 p-2 text-gray-600 hover:text-neon-green opacity-50 hover:opacity-100 transition-opacity"
-                  title="Replay Audio"
-                >
-                  <Volume2 size={16} />
-                </button>
+              {/* Highlight Progress Bar */}
+              {msg.role === 'assistant' && i === history.length - 1 && isSpeaking && (
+                 <div className="mt-2 h-1 w-full bg-green-900/30 rounded overflow-hidden">
+                    <div className="h-full bg-neon-green transition-all duration-300" style={{ width: `${((currentSentenceIdx + 1) / speechQueue.length) * 100}%` }}></div>
+                 </div>
               )}
             </div>
           </div>
@@ -225,22 +262,21 @@ export default function Terminal({ onImageCommand }: { onImageCommand: (p: strin
 
       {/* INPUT BAR */}
       <div className="mt-2 border-t border-green-900/50 pt-2 flex gap-2 items-center bg-black/80 p-2">
-        <span className="text-neon-green animate-pulse">&gt;</span>
+        <span className={`text-neon-green ${wakeWordActive ? 'animate-bounce' : ''}`}>&gt;</span>
         <input 
           type="text" 
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           className="flex-1 bg-transparent text-green-100 focus:outline-none placeholder-green-900 text-base"
-          placeholder={continuousMode ? "Listening..." : "Type command..."}
+          placeholder={wakeWordActive ? "Listening to command..." : "Say 'Kyle'..."}
         />
         
-        {/* Main Mic/Stop Button */}
         <button 
-          onClick={isSpeaking ? stopSpeaking : toggleListening} 
-          className={`p-3 rounded-full transition-all duration-300 ${isListening ? 'bg-red-900/20 text-red-500 border border-red-900 animate-pulse' : 'text-neon-green hover:bg-green-900/30'}`}
+          onClick={startListening} 
+          className={`p-3 rounded-full transition-all duration-300 ${wakeWordActive ? 'bg-red-600 text-white shadow-[0_0_15px_red]' : (isListening ? 'text-neon-green bg-green-900/20' : 'text-gray-500')}`}
         >
-          {isSpeaking ? <Square size={20} fill="currentColor" /> : (isListening ? <MicOff size={20} /> : <Mic size={20} />)}
+          {wakeWordActive ? <Mic size={20} /> : (isListening ? <Mic size={20} /> : <MicOff size={20} />)}
         </button>
       </div>
     </div>
