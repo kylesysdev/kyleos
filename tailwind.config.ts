@@ -5,35 +5,30 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: 'class', // REQUIRED for the Light/Dark toggle to work
   theme: {
     extend: {
       colors: {
-        glass: {
-          100: "rgba(255, 255, 255, 0.1)",
-          200: "rgba(255, 255, 255, 0.2)",
-          300: "rgba(255, 255, 255, 0.3)",
-          dark: "rgba(0, 0, 0, 0.6)",
+        kyle: {
+          green: "#00ff41",
+          blue: "#00f3ff",
+          dark: "#050505",
+          light: "#f0f2f5",
         },
-        apple: {
-          blue: "#0A84FF",
-          gray: "#8E8E93",
-          red: "#FF453A",
-        }
-      },
-      backdropBlur: {
-        xs: '2px',
-        md: '12px',
-        lg: '24px',
-        xl: '40px',
       },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'float': 'float 6s ease-in-out infinite',
+        'breath': 'breath 4s ease-in-out infinite',
+        'speak': 'speak 0.5s ease-in-out infinite',
+        'listen': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
       keyframes: {
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-10px)' },
+        breath: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '0.8' },
+          '50%': { transform: 'scale(1.1)', opacity: '0.5' },
+        },
+        speak: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.05)' },
         }
       }
     },
