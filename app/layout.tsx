@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "KyleOS",
+  title: "KyleOS 2.0",
   description: "Knowledge Yielding Lifelike Engine",
 };
 
@@ -13,10 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        <div className="scanline"></div>
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
