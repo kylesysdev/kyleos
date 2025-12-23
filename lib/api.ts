@@ -1,4 +1,4 @@
-// THE BRAIN (Text)
+// 1. TEXT GENERATION (Brain)
 export async function askKyle(messages: any[]) {
   try {
     const response = await fetch('https://text.pollinations.ai/', {
@@ -8,7 +8,7 @@ export async function askKyle(messages: any[]) {
         messages: [
           { 
             role: 'system', 
-            content: 'You are KYLE (Knowledge Yielding Lifelike Engine). You are a sophisticated, helpful AI assistant. You answer concisely. You can generate code, write poems, and answer complex questions.' 
+            content: 'You are KYLE (Knowledge Yielding Lifelike Engine). You are a futuristic AI assistant. You answer concisely. You have a dry, witty personality.' 
           },
           ...messages
         ],
@@ -16,14 +16,19 @@ export async function askKyle(messages: any[]) {
         seed: 42,
       }),
     });
+    
+    if (!response.ok) throw new Error('API Error');
     return await response.text();
+    
   } catch (error) {
-    return "I am having trouble connecting to the neural cloud.";
+    console.error(error);
+    return "I cannot connect to my neural core right now.";
   }
 }
 
-// THE EYE (Images)
+// 2. IMAGE GENERATION (Vision)
 export function generateImageUrl(prompt: string): string {
   const safePrompt = encodeURIComponent(prompt);
+  // Using 'flux' model for best quality
   return `https://image.pollinations.ai/prompt/${safePrompt}?nologo=true&enhance=true&model=flux`;
 }
