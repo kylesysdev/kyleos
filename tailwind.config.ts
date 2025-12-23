@@ -8,18 +8,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        neon: {
-          green: "#00ff41",
-          blue: "#00f3ff",
-          dark: "#050505",
+        glass: {
+          100: "rgba(255, 255, 255, 0.1)",
+          200: "rgba(255, 255, 255, 0.2)",
+          300: "rgba(255, 255, 255, 0.3)",
+          dark: "rgba(0, 0, 0, 0.6)",
         },
+        apple: {
+          blue: "#0A84FF",
+          gray: "#8E8E93",
+          red: "#FF453A",
+        }
       },
-      fontFamily: {
-        mono: ['"Courier New"', 'Courier', 'monospace'],
+      backdropBlur: {
+        xs: '2px',
+        md: '12px',
+        lg: '24px',
+        xl: '40px',
       },
-      backgroundImage: {
-        "grid-pattern": "linear-gradient(to right, #1a1a1a 1px, transparent 1px), linear-gradient(to bottom, #1a1a1a 1px, transparent 1px)",
+      animation: {
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'float': 'float 6s ease-in-out infinite',
       },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        }
+      }
     },
   },
   plugins: [],
