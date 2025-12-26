@@ -1,53 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@layer components {
-  .glass-panel {
-    @apply backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl;
-  }
-  
-  .glass-input {
-    @apply backdrop-blur-md bg-black/20 border border-white/10 focus:border-cyan-500/50 transition-all;
-  }
-}
+
 :root {
-  /* LIGHT MODE DEFAULTS */
-  --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
-  --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --text-primary: #1a1a1a;
+  --bg: #f0f2f5;
+  --glass: rgba(255, 255, 255, 0.6);
+  --border: rgba(255, 255, 255, 0.4);
 }
 
 .dark {
-  /* DARK MODE DEFAULTS (The "Kyle" Look) */
-  --bg-gradient: radial-gradient(circle at 50% 0%, #0f172a 0%, #000000 100%);
-  --glass-bg: rgba(10, 10, 10, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --text-primary: #ffffff;
+  --bg: radial-gradient(circle at 50% 0%, #0f172a 0%, #000000 100%);
+  --glass: rgba(10, 10, 10, 0.6);
+  --border: rgba(255, 255, 255, 0.1);
 }
 
 body {
-  background: var(--bg-gradient);
-  color: var(--text-primary);
-  transition: background 0.5s ease, color 0.5s ease;
-  overflow: hidden; /* App-like feel, no scrolling the whole page */
+  background: var(--bg);
+  min-height: 100vh;
+  overflow: hidden;
 }
 
-/* Glass Utility Class */
 .glass {
-  background: var(--glass-bg);
+  background: var(--glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border);
 }
 
-/* Hide Scrollbar but allow scrolling */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
