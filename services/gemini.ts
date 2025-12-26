@@ -1,24 +1,32 @@
+// services/gemini.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Ensure you set NEXT_PUBLIC_GEMINI_KEY in your Vercel/Render env settings
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_KEY || "");
 
-export const geminiService = {
-  async chat(history: any[], message: string) {
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro", 
-      systemInstruction: "You are Kyle, a witty, high-intelligence system. Be concise." 
-    });
-    
-    // Map history to Google's expected format
-    const chat = model.startChat({
-      history: history.map(m => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }]
-      }))
-    });
+export const aiService = {
+  // Logic to determine if user wants a message or an image
+  async processInput(history: any[], input: string) {
+    const isImageRequest = input.toLowerCase().startsWith('/image') || input.toLowerCase().includes('generate image');
 
-    const result = await chat.sendMessage(message);
-    return result.response.text();
+    if (isImageRequest) {
+      // 1. Image Path: Clean prompt and return Pollinations URL
+      const prompt = input.replace(/^\/image/i, '').replace(/generate image/i, '').trim();
+      const safePrompt = encodeURIComponent(prompt || input);
+      return {
+        type: 'image',
+        content: `https://image.pollinations.ai/prompt/${safePrompt}?nologo=true&enhance=true&model=flux`
+      };
+    } else {
+      // 2. Text Path: Call Gemini for a smart response
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const chat = model.startChat({
+        history: history.filter(m => m.type !== 'image').map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        }))
+      });
+      const result = await chat.sendMessage(input);
+      return { type: 'text', content: result.response.text() };
+    }
   }
 };
