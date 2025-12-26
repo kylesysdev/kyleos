@@ -10,15 +10,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        kyle: { green: "#00ff41", blue: "#00f3ff", dark: "#050505" },
+        kyle: {
+          green: "#00ff41",
+          blue: "#00f3ff",
+          dark: "#050505",
+        },
       },
       animation: {
         'breath': 'breath 4s ease-in-out infinite',
         'speak': 'speak 0.5s ease-in-out infinite',
       },
       keyframes: {
-        breath: { '0%, 100%': { transform: 'scale(1)', opacity: '0.8' }, '50%': { transform: 'scale(1.1)', opacity: '0.4' } },
-        speak: { '0%, 100%': { transform: 'scale(1)' }, '50%': { transform: 'scale(1.1)' } }
+        breath: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '0.8' },
+          '50%': { transform: 'scale(1.1)', opacity: '0.4' },
+        },
+        speak: {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.15)' },
+        }
       }
     },
   },
