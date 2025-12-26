@@ -1,11 +1,3 @@
-import Groq from "groq-sdk";
-
-// Defensive check to prevent the "Neural silence"
-const groq = new Groq({ 
-  apiKey: process.env.NEXT_PUBLIC_GROQ_KEY || "missing_key",
-  dangerouslyAllowBrowser: true 
-});
-
 export const aiService = {
   async process(history: any[], input: string) {
     try {
@@ -17,24 +9,26 @@ export const aiService = {
         };
       }
 
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: "You are Kyle, an elite AI OS. Be witty and concise." },
-          ...history.filter(m => m.type !== 'image').map(m => ({
-            role: m.role === 'user' ? 'user' : 'assistant',
-            content: m.content
-          })),
-          { role: "user", content: input }
-        ],
-        model: "llama3-8b-8192",
+      // Talk to our internal API route
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            ...history.filter(m => m.type !== 'image').map(m => ({
+              role: m.role === 'user' ? 'user' : 'assistant',
+              content: m.content
+            })),
+            { role: "user", content: input }
+          ]
+        })
       });
 
-      return { 
-        type: 'text', 
-        content: chatCompletion.choices[0]?.message?.content || "Neural silence." 
-      };
+      if (!response.ok) throw new Error("Neural Link Down");
+      const data = await response.json();
+      return { type: 'text', content: data.content };
     } catch (error) {
-      console.error("Neural Error:", error);
+      console.error("Brain failed:", error);
       throw error;
     }
   }
