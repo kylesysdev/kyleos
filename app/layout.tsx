@@ -1,28 +1,16 @@
 import "./globals.css";
-import type { Metadata, Viewport } from "next";
 
-export const viewport: Viewport = {
-  themeColor: "#050505",
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
-
-export const metadata: Metadata = {
+export const metadata = {
   title: "KyleOS 4.0",
-  description: "Knowledge Yielding Lifelike Engine",
-  manifest: "/manifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent" },
+  description: "The Ultimate AI OS",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="antialiased selection:bg-kyle-green selection:text-black">
+    <html lang="en">
+      <body style={{ margin: 0, padding: 0, background: 'black' }}>
         {children}
       </body>
     </html>
   );
 }
-
