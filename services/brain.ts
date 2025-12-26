@@ -1,14 +1,14 @@
 import Groq from "groq-sdk";
 
+// Defensive check to prevent the "Neural silence"
 const groq = new Groq({ 
-  apiKey: process.env.NEXT_PUBLIC_GROQ_KEY,
+  apiKey: process.env.NEXT_PUBLIC_GROQ_KEY || "missing_key",
   dangerouslyAllowBrowser: true 
 });
 
 export const aiService = {
   async process(history: any[], input: string) {
     try {
-      // 1. Handle Images (Still using Pollinations)
       if (input.toLowerCase().startsWith('/image')) {
         const prompt = input.replace('/image', '').trim();
         return { 
@@ -17,17 +17,16 @@ export const aiService = {
         };
       }
 
-      // 2. Chat with Llama 3 via Groq (Super Fast)
       const chatCompletion = await groq.chat.completions.create({
         messages: [
-          { role: "system", content: "You are Kyle, a witty, high-intelligence system. Be concise and sharp." },
+          { role: "system", content: "You are Kyle, an elite AI OS. Be witty and concise." },
           ...history.filter(m => m.type !== 'image').map(m => ({
             role: m.role === 'user' ? 'user' : 'assistant',
             content: m.content
           })),
           { role: "user", content: input }
         ],
-        model: "llama3-8b-8192", // Fastest model available
+        model: "llama3-8b-8192",
       });
 
       return { 
@@ -35,7 +34,7 @@ export const aiService = {
         content: chatCompletion.choices[0]?.message?.content || "Neural silence." 
       };
     } catch (error) {
-      console.error("Groq Neural Error:", error);
+      console.error("Neural Error:", error);
       throw error;
     }
   }
