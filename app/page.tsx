@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { aiService } from '@/services/brain'; // FIXED: Changed from gemini to brain
+import { aiService } from '../services/brain'; // FIXED: Changed from gemini to brain
 import { MemoryBank } from '@/lib/memory';
 import OrbFace from '@/components/OrbFace';
 import { Mic, Send, Trash2, Zap } from 'lucide-react';
