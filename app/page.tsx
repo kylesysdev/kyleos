@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { aiService } from '@/services/brain';
+import { aiService } from '@/services/brain'; // FIXED: Changed from gemini to brain
 import { MemoryBank } from '@/lib/memory';
 import OrbFace from '@/components/OrbFace';
-import { Mic, Send, Trash2, Sparkles, Zap } from 'lucide-react';
+import { Mic, Send, Trash2, Zap } from 'lucide-react';
 
 export default function Page() {
   const [messages, setMessages] = useState<any[]>([]);
@@ -43,9 +43,8 @@ export default function Page() {
         setStatus('idle');
       }
     } catch (e) {
-      console.error(e);
       setStatus('idle');
-      setMessages(prev => [...prev, { role: 'assistant', content: "Neural Link bypass required. Check Groq Key.", type: 'text' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Neural Link bypass required. Verify Groq Key in Vercel Settings.", type: 'text' }]);
     }
   };
 
@@ -70,7 +69,7 @@ export default function Page() {
           <Zap className="text-kyle-blue animate-pulse" size={20} />
           <h1 className="text-xl font-bold tracking-tighter uppercase">Kyle<span className="text-kyle-blue italic">OS</span></h1>
         </div>
-        <button onClick={() => { MemoryBank.clear(); setMessages([]); }} className="p-2 glass rounded-full hover:bg-red-500/20 transition-all text-gray-500 hover:text-red-400">
+        <button onClick={() => { MemoryBank.clear(); setMessages([]); }} className="p-2 glass rounded-full hover:bg-red-500/20 transition-all text-gray-500">
           <Trash2 size={18} />
         </button>
       </div>
@@ -100,7 +99,7 @@ export default function Page() {
           onKeyDown={e => e.key === 'Enter' && handleSend(input)} 
           placeholder="Communicate via Groq Link..."
         />
-        <button onClick={() => handleSend(input)} className="p-5 rounded-full bg-kyle-blue text-black font-bold shadow-[0_0_20px_rgba(0,243,255,0.4)]">
+        <button onClick={() => handleSend(input)} className="p-5 rounded-full bg-kyle-blue text-black font-bold">
           <Send size={28}/>
         </button>
       </div>
