@@ -1,7 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+@layer components {
+  .glass-panel {
+    @apply backdrop-blur-xl bg-white/10 border border-white/20 shadow-2xl;
+  }
+  
+  .glass-input {
+    @apply backdrop-blur-md bg-black/20 border border-white/10 focus:border-cyan-500/50 transition-all;
+  }
+}
 :root {
   /* LIGHT MODE DEFAULTS */
   --bg-gradient: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
@@ -42,3 +50,4 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
