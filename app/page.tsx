@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { aiService } from '@/services/gemini'; // Filename is gemini, brain is Groq
+import { aiService } from '@/services/brain';
 import { MemoryBank } from '@/lib/memory';
 import OrbFace from '@/components/OrbFace';
 import { Mic, Send, Trash2, Sparkles, Zap } from 'lucide-react';
