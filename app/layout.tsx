@@ -1,5 +1,5 @@
-import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import type { Metadata, Viewport } from "next";
 
 export const viewport: Viewport = {
   themeColor: "#050505",
@@ -25,3 +25,4 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+
